@@ -54,8 +54,10 @@ class Frog:
         # Hurt state setup. When hurt_timer > 0 the frog cannot be hit again.
         self.hurt_timer = 0.0
 
-        # Debug-only: last steering force from arrive(), for the F1 overlay.
+        # Debug-only: last steering force from arrive(), and the desired
+        # velocity it steers toward, for the debug overlay.
         self.dbg_steer = V2()
+        self.dbg_desired = V2()
 
     def set_target(self, p):
         """Set a new target the frog will move toward using Arrive."""
@@ -80,6 +82,9 @@ class Frog:
         # Compute steering with Arrive
         steer = arrive(self.pos, self.vel, self.target, self.speed)
         self.dbg_steer = steer
+        # desired velocity = velocity before this frame's steering is applied,
+        # plus the steering force (steer == desired - vel for seek/arrive).
+        self.dbg_desired = self.vel + steer
 
         # Integrate velocity with dt and clamp to max speed
         self.vel = integrate_velocity(self.vel, steer, dt, self.speed)

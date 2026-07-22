@@ -15,7 +15,7 @@ from settings import *
 from utils import draw_grid
 from world import World
 from entities.frog import Frog
-from entities.fly import Fly
+from entities.fly import Fly, FlyState
 from entities.snake import Snake, SnakeState
 
 def draw_vector(surf, origin, vec, color, scale=DEBUG_VECTOR_SCALE, min_len=4.0):
@@ -37,17 +37,18 @@ def draw_label(surf, font, pos, text, color=DEBUG_TEXT):
     surf.blit(txt, (pos[0] - txt.get_width() // 2, pos[1] - 26))
 
 def draw_debug_frog(surf, frog):
-    """Debug overlay for the frog (toggle with 1): arrive target/radii, velocity, braking force."""
+    """Debug overlay for the frog (toggle with 1): arrive target/radii, velocity,
+    desired velocity, and steering force."""
     pygame.draw.circle(surf, DEBUG_ARRIVE_SLOW_CIRCLE, frog.target, ARRIVE_SLOW_RADIUS, 1)
     pygame.draw.circle(surf, DEBUG_ARRIVE_STOP_CIRCLE, frog.target, ARRIVE_STOP_RADIUS, 1)
     pygame.draw.circle(surf, DEBUG_CLICK_POINT, frog.target, 4)
     draw_vector(surf, frog.pos, frog.vel, DEBUG_VEL_VECTOR)
-    if (frog.target - frog.pos).length() < ARRIVE_SLOW_RADIUS:
-        draw_vector(surf, frog.pos, frog.dbg_steer, DEBUG_BRAKE_VECTOR)
+    draw_vector(surf, frog.pos, frog.dbg_desired, DEBUG_DESIRED_VECTOR)
+    draw_vector(surf, frog.pos, frog.dbg_steer, DEBUG_STEER_VECTOR)
 
 def draw_debug_snakes(surf, font, snakes):
     """Debug overlay for snakes (toggle with 2): patrol points, aggro range, state,
-    velocity, avoidance rays, and arrive braking/radii."""
+    velocity, desired velocity, steering force, avoidance rays, and arrive radii."""
     for s in snakes:
         # Patrol path: the waypoints the snake commutes between while patrolling.
         pygame.draw.line(surf, DEBUG_PATROL_LINE, s.home, s.patrol_point, 1)
@@ -59,6 +60,8 @@ def draw_debug_snakes(surf, font, snakes):
 
         draw_label(surf, font, s.pos, s.state.name)
         draw_vector(surf, s.pos, s.vel, DEBUG_VEL_VECTOR)
+        draw_vector(surf, s.pos, s.dbg_desired, DEBUG_DESIRED_VECTOR)
+        draw_vector(surf, s.pos, s.dbg_steer, DEBUG_STEER_VECTOR)
 
         # Corridors sampled this frame by seek_with_avoid while searching for
         # a free path around obstacles.
@@ -66,19 +69,17 @@ def draw_debug_snakes(surf, font, snakes):
             color = DEBUG_RAY_BLOCKED if blocked else DEBUG_RAY_FREE
             pygame.draw.line(surf, color, s.pos, end_point, 1)
 
-        # Arrive slow/stop radii and braking force, only meaningful for the
-        # arrive-based states (Patrol*/Harmless), not Aggro (pursue) or
-        # Confused (wander).
+        # Arrive slow/stop radii, only meaningful for the arrive-based states
+        # (Patrol*/Harmless), not Aggro (pursue) or Confused (wander).
         if s.dbg_arrive and s.dbg_target is not None:
             pygame.draw.circle(surf, DEBUG_ARRIVE_SLOW_CIRCLE, s.dbg_target, ARRIVE_SLOW_RADIUS, 1)
             pygame.draw.circle(surf, DEBUG_ARRIVE_STOP_CIRCLE, s.dbg_target, ARRIVE_STOP_RADIUS, 1)
-            if (s.dbg_target - s.pos).length() < ARRIVE_SLOW_RADIUS:
-                draw_vector(surf, s.pos, s.dbg_steer, DEBUG_BRAKE_VECTOR)
 
 def draw_debug_flies(surf, font, flies, frog):
-    """Debug overlay for flies (toggle with 3): flee-trigger ranges, state,
-    velocity, and boids component vectors."""
+    """Debug overlay for flies (toggle with 3): flee-trigger ranges, the
+    Flock <-> Idle trigger range, state, velocity, and boids component vectors."""
     pygame.draw.circle(surf, DEBUG_FLY_SCARE_CIRCLE, frog.pos, FLY_SCARE_BY_FROG_RANGE, 1)
+    pygame.draw.circle(surf, DEBUG_FLY_IDLE_CIRCLE, frog.pos, FLY_IDLE_DISTANCE, 1)
     for b in frog.bubbles:
         pygame.draw.circle(surf, DEBUG_BUBBLE_CIRCLE, b.pos, FLY_BUBBLE_FLEE_RANGE, 1)
 
@@ -88,6 +89,15 @@ def draw_debug_flies(surf, font, flies, frog):
         draw_vector(surf, f.pos, f.dbg_sep, DEBUG_SEP_VECTOR)
         draw_vector(surf, f.pos, f.dbg_coh, DEBUG_COH_VECTOR)
         draw_vector(surf, f.pos, f.dbg_ali, DEBUG_ALI_VECTOR)
+
+        # Wander circle projected ahead of an Idle fly, and the point chosen
+        # on it this frame (see wander_force's debug_out).
+        if f.state == FlyState.Idle:
+            circle_pos = f.pos + f.dbg_wander_circle
+            point_pos = f.pos + f.dbg_wander_point
+            pygame.draw.circle(surf, DEBUG_WANDER_CIRCLE, circle_pos, f.dbg_wander_radius, 1)
+            pygame.draw.line(surf, DEBUG_WANDER_CIRCLE, f.pos, circle_pos, 1)
+            pygame.draw.circle(surf, DEBUG_WANDER_POINT, point_pos, 4)
 
 def main():
     # Initialize Pygame and create a window and a clock
@@ -263,7 +273,7 @@ def main():
         # Draw fly counter and control hint
         txt = font.render(f"Flies: {fly_count}/{FLIES_TO_WIN}", True, (240, 240, 240))
         screen.blit(txt, (16, 42))
-        tips = font.render("Click to move, Space to bubble, R to restart", True, MUTED)
+        tips = font.render("Click to move, Space to bubble, R to restart, DEBUG: 1 for frog, 2 for snakes, 3 for flies", True, MUTED)
         screen.blit(tips, (16, 68))
 
         # If game over, dim the screen and show a message

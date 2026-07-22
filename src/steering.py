@@ -38,9 +38,13 @@ def flee(pos, vel, target, max_speed):
     """
     # Find the direction that go away from the threat (target)
     threat_vector = pos - target
-    # If the threat_vector is zero, return a zero vector to avoid division by zero
-    if threat_vector.length_squared() == 0:
-        return V2()
+    # threat_vector has no direction when the threat is (almost) exactly on top
+    # of us. Rather than freeze with zero force, fall back to fleeing opposite
+    # our own current heading (or a fixed direction if we're also stationary),
+    # so we still get pushed clear instead of sitting still on top of the threat.
+    if threat_vector.length_squared() < 1e-6:
+        fallback_dir = -vel.normalize() if vel.length_squared() > 0 else V2(1, 0)
+        return fallback_dir * max_speed - vel
     # Normalize the threat_vector and scale it to max_speed to get the desired velocity
     desired_velocity = threat_vector.normalize() * max_speed
     # Return the steering force, which is the difference between desired velocity and current velocity
@@ -76,13 +80,16 @@ def arrive(pos, vel, target, max_speed, slow_radius=ARRIVE_SLOW_RADIUS, stop_rad
 
     return seek(pos, vel, target, desired_speed)
 
-def integrate_velocity(vel, force, dt, max_speed):
+def integrate_velocity(vel, force, dt, max_speed, force_cap=600.0):
     """
     Apply a steering force to velocity using Euler integration.
     Then clamp to max speed and return the new velocity.
     Use this inside agent update methods after computing steering forces.
+    force_cap limits how much force can be applied per second before max_speed
+    clamping; override it per behavior (e.g. a gentler cap for a soft blend,
+    a stronger one for a snappy panic response).
     """
-    vel += limit(force, 500.0) * dt
+    vel += limit(force, force_cap) * dt
     if vel.length() > max_speed:
         vel.scale_to_length(max_speed)
     return vel
@@ -270,23 +277,28 @@ def evade(pos, vel, threat_pos, threat_vel, max_speed):
     """
     direction_away_from_threat = pos - threat_pos
     distance = direction_away_from_threat.length()
-    if distance == 0:
-        return V2()
     time_horizon = distance / (max_speed + 0.001)  # small epsilon to avoid division by zero
     predicted_threat_position = threat_pos + threat_vel * time_horizon
+
     return flee(pos, vel, predicted_threat_position, max_speed)
 
-def wander_force(me_vel, wander_angle, jitter_deg=12.0, circle_distance=24.0, circle_radius=18.0, rng_seed=None):
+def wander_force(me_vel, wander_angle, jitter_deg=12.0, circle_distance=24.0, circle_radius=18.0, rng_seed=None, debug_out=None):
     """
     Return a small random steering vector for gentle drift.
     Classic wander
       Project a small circle ahead along current heading, then jitter the
       target point on that circle by a tiny random angle each update.
     Use this for Fly Idle and Snake Confused.
+
+    debug_out, if given a list, gets one (circle_center, wander_target, circle_radius)
+    tuple appended, both vectors relative to the caller's position, purely for
+    visualization of the wander circle and the point chosen on it.
     """
     if me_vel.length_squared() == 0:
+        if debug_out is not None:
+            debug_out.append((V2(circle_distance, 0), V2(1, 0), circle_radius))
         return V2(1, 0), wander_angle
-    
+
     # Compute the forward direction and the center of the wander circle
     forward_direction = me_vel.normalize()
     circle_center = forward_direction * circle_distance
@@ -299,6 +311,8 @@ def wander_force(me_vel, wander_angle, jitter_deg=12.0, circle_distance=24.0, ci
 
     # Compute the final wander target by adding the circle center and the target point on the circle
     wander_target = circle_center + target_point_on_circle
+    if debug_out is not None:
+        debug_out.append((circle_center, wander_target, circle_radius))
     return wander_target, wander_angle
 
 

@@ -21,10 +21,9 @@ from settings import (
     FLY_SCARE_BY_FROG_RANGE, FLY_BUBBLE_FLEE_RANGE,
     FLY_STOP_FLEEING_RANGE, FLY_IDLE_DISTANCE, FLY_IDLE_DELAY
 )
-from utils import limit
 from steering import (
     boids_separation, boids_cohesion, boids_alignment,
-    flee, evade, wander_force
+    evade, wander_force, integrate_velocity
 )
 
 class FlyState(Enum):
@@ -56,6 +55,12 @@ class Fly:
         self.dbg_sep = V2()
         self.dbg_coh = V2()
         self.dbg_ali = V2()
+
+        # Debug-only: wander circle center and chosen point, relative to
+        # self.pos, filled in only while Idle (see wander_force's debug_out).
+        self.dbg_wander_circle = V2()
+        self.dbg_wander_point = V2()
+        self.dbg_wander_radius = 0.0
 
     def sense_bubbles_close(self, bubbles, r):
         """Return True if any bubble is within range r of the fly."""
@@ -137,8 +142,8 @@ class Fly:
             center = V2(bounds_rect.centerx, bounds_rect.centery)
             force += (center - self.pos) * ANCHOR_WEIGHT * 0.002
 
-            # Integrate velocity
-            self.vel += limit(force, 240.0) * dt
+            # Integrate velocity: gentle force cap keeps the boids blend calm
+            self.vel = integrate_velocity(self.vel, force, dt, FLY_SPEED, force_cap=240.0)
 
         elif self.state == FlyState.Fleeing:
             self.dbg_sep = self.dbg_coh = self.dbg_ali = V2()
@@ -148,17 +153,21 @@ class Fly:
             center = V2(bounds_rect.centerx, bounds_rect.centery)
             force += (center - self.pos) * ANCHOR_WEIGHT * 0.002
 
-            self.vel += limit(force, 340.0) * dt
+            # Stronger force cap for a snappy panic response
+            self.vel = integrate_velocity(self.vel, force, dt, FLY_SPEED, force_cap=340.0)
 
         elif self.state == FlyState.Idle:
             self.dbg_sep = self.dbg_coh = self.dbg_ali = V2()
-            force, self.wander_angle = wander_force(self.vel, self.wander_angle, rng_seed=self._rng)
-            self.vel += limit(force, 120.0) * dt
-            self.vel *= 0.98  # mild damping so idle feels soft
+            dbg_wander = []
+            force, self.wander_angle = wander_force(self.vel, self.wander_angle, rng_seed=self._rng,
+                                                      debug_out=dbg_wander)
+            if dbg_wander:
+                self.dbg_wander_circle, self.dbg_wander_point, self.dbg_wander_radius = dbg_wander[0]
+            # Weak force cap plus damping so idle drift feels soft
+            self.vel = integrate_velocity(self.vel, force, dt, FLY_SPEED, force_cap=120.0)
+            self.vel *= 0.98
 
-        # Speed clamp and position integrate
-        if self.vel.length() > FLY_SPEED:
-            self.vel.scale_to_length(FLY_SPEED)
+        # Position integrate (velocity is already speed-clamped by integrate_velocity)
         self.pos += self.vel * dt
 
         # Soft containment inside arena

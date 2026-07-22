@@ -23,8 +23,8 @@ class World:
 
     def _build_obstacles(self, w, h):
         """Create a few rectangles with a fixed random seed for reproducibility."""
-        rng = random.Random(9)
-        for _ in range(9):
+        rng = random.Random(4)
+        for _ in range(4):
             ww = rng.randint(80, 180)
             hh = rng.randint(60, 140)
             x = rng.randint(40, w - ww - 40)

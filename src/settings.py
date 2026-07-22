@@ -25,7 +25,7 @@ MUTED = (180, 188, 196)  # hint text
 
 # Frog setup
 FROG_RADIUS = 16          # draw size and collision size for the frog
-FROG_SPEED  = 120.0       # top speed for the frog in pixels per second
+FROG_SPEED  = 150.0       # top speed for the frog in pixels per second
 HURT_INVULN = 1.0         # seconds of temporary invulnerability after damage
 
 # Bubble setup
@@ -51,17 +51,17 @@ ANCHOR_WEIGHT   = 0.6     # small pull to arena center to keep flock on screen
 FLY_SCARE_BY_FROG_RANGE = 160.0   # panic if the frog comes within this range
 FLY_BUBBLE_FLEE_RANGE   = 140.0   # panic if a bubble comes within this range
 FLY_STOP_FLEEING_RANGE  = 220.0   # calm down once both frog and bubbles are beyond this
-FLY_IDLE_DISTANCE       = 400.0   # far enough from the frog to consider idling
+FLY_IDLE_DISTANCE       = 300.0   # far enough from the frog to consider idling
 FLY_IDLE_DELAY          = 2.0     # seconds of calm/far time before entering Idle
 
 # Arrive behavior
 # Slow inside slow radius and stop inside stop radius
 ARRIVE_SLOW_RADIUS = 100.0
 ARRIVE_STOP_RADIUS = 20.0
-ARRIVE_BRAKE_GAIN = 3.0
+ARRIVE_BRAKE_GAIN = 5.0
 
 # Snake setup
-NUM_SNAKES  = 3
+NUM_SNAKES  = 0
 SNAKE_RADIUS = 18
 SNAKE_SPEED  = 80.0
 
@@ -87,13 +87,15 @@ DEBUG_PATROL_LINE      = (140, 140, 190) # line + waypoint markers for snake pat
 DEBUG_AGGRO_CIRCLE     = (255, 120, 120) # ring at AGGRO_RANGE around each snake: Aggro trigger
 DEBUG_ARRIVE_SLOW_CIRCLE = (120, 200, 255) # ring at ARRIVE_SLOW_RADIUS around the snake's target
 DEBUG_ARRIVE_STOP_CIRCLE = (255, 120, 160) # ring at ARRIVE_STOP_RADIUS around the snake's target
-DEBUG_BRAKE_VECTOR     = (255, 180, 60)  # arrive's braking steering force (opposite of overshoot)
 DEBUG_RAY_FREE         = (120, 255, 150) # obstacle-avoidance corridor sample: not blocked
 DEBUG_RAY_BLOCKED      = (255, 90, 90)   # obstacle-avoidance corridor sample: blocked
 
 # Fly overlay
 DEBUG_FLY_SCARE_CIRCLE = (200, 120, 250) # ring at FLY_SCARE_BY_FROG_RANGE around the frog: Flee trigger
 DEBUG_BUBBLE_CIRCLE    = (120, 180, 255) # ring at FLY_BUBBLE_FLEE_RANGE around each bubble: Flee trigger
+DEBUG_FLY_IDLE_CIRCLE  = (255, 210, 100) # ring at FLY_IDLE_DISTANCE around the frog: Flock <-> Idle trigger
+DEBUG_WANDER_CIRCLE    = (150, 150, 255) # wander circle projected in front of an Idle fly
+DEBUG_WANDER_POINT     = (255, 255, 255) # the point chosen on the wander circle this frame
 DEBUG_SEP_VECTOR       = (255, 120, 120) # boids separation component
 DEBUG_COH_VECTOR       = (120, 220, 255) # boids cohesion component
 DEBUG_ALI_VECTOR       = (150, 255, 150) # boids alignment component
@@ -101,3 +103,5 @@ DEBUG_ALI_VECTOR       = (150, 255, 150) # boids alignment component
 # Frog overlay
 DEBUG_CLICK_POINT      = (255, 255, 255) # last click target
 DEBUG_VEL_VECTOR       = (255, 255, 255) # current velocity, drawn for all three agent types
+DEBUG_DESIRED_VECTOR   = (255, 255, 0)   # desired velocity (target heading before steering is applied)
+DEBUG_STEER_VECTOR     = (255, 0, 255)   # steering force actually applied this frame (frog + snake)

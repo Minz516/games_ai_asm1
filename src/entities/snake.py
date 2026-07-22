@@ -70,6 +70,7 @@ class Snake:
         self.dbg_target = None       # current arrive/pursue target point, if any
         self.dbg_rays = []           # (angle_deg, end_point, blocked) tested this frame
         self.dbg_steer = V2()        # last steering force
+        self.dbg_desired = V2()      # desired velocity the steering force is steering toward
         self.dbg_arrive = False      # whether the current state uses arrive (slow/stop radii apply)
 
     def set_state(self, st):
@@ -146,6 +147,9 @@ class Snake:
             steer, self.wander_angle = wander_force(self.vel, self.wander_angle, rng_seed=self._rng)
 
         self.dbg_steer = steer
+        # desired velocity = velocity before this frame's steering is applied,
+        # plus the steering force (steer == desired - vel for seek/arrive/pursue).
+        self.dbg_desired = self.vel + steer
 
         # Integrate velocity and update position
         self.vel = integrate_velocity(self.vel, steer, dt, self.speed)
